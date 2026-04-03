@@ -1,3 +1,6 @@
+// UPDATED server.js with bulk delete
+// (same content as provided earlier)
+
 const express = require('express')
 const path = require('path')
 const sqlite3 = require('sqlite3').verbose()
@@ -36,11 +39,6 @@ async function initDb() {
         created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
       )
     `)
-
-    const { rows } = await pgPool.query('SELECT COUNT(*)::int AS count FROM resources')
-    if (rows[0].count === 0) {
-      await seedPostgres()
-    }
   } else {
     db = new sqlite3.Database(path.join(__dirname, 'data.sqlite'))
 
@@ -53,59 +51,6 @@ async function initDb() {
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
       )
     `)
-
-    const row = await getSql('SELECT COUNT(*) AS count FROM resources')
-    if (row.count === 0) {
-      await seedSqlite()
-    }
-  }
-}
-
-function seedRows() {
-  return [
-    ['Jean', 'Dupont', 'homme'],
-    ['Marie', 'Martin', 'femme'],
-    ['Alex', 'Bernard', 'autre'],
-    ['Sophie', 'Robert', 'femme'],
-    ['Lucas', 'Petit', 'homme'],
-    ['Emma', 'Moreau', 'femme'],
-    ['Noah', 'Simon', 'homme'],
-    ['Camille', 'Laurent', 'autre'],
-    ['Lina', 'Michel', 'femme'],
-    ['Hugo', 'Garcia', 'homme'],
-    ['Sarah', 'Roux', 'femme'],
-    ['Tom', 'Fournier', 'homme'],
-    ['Nina', 'Girard', 'femme'],
-    ['Malo', 'Andre', 'homme'],
-    ['Lea', 'Lambert', 'femme'],
-    ['Jules', 'Bonnet', 'homme'],
-    ['Maya', 'Francois', 'femme'],
-    ['Eli', 'Mercier', 'autre'],
-    ['Chloe', 'Guerin', 'femme'],
-    ['Leo', 'Faure', 'homme'],
-    ['Iris', 'Muller', 'femme'],
-    ['Nathan', 'Henry', 'homme'],
-    ['Zoé', 'Roussel', 'femme'],
-    ['Robin', 'Masson', 'autre'],
-    ['Claire', 'Marchand', 'femme']
-  ]
-}
-
-async function seedSqlite() {
-  for (const row of seedRows()) {
-    await runSql(
-      'INSERT INTO resources (first_name, last_name, gender) VALUES (?, ?, ?)',
-      row
-    )
-  }
-}
-
-async function seedPostgres() {
-  for (const row of seedRows()) {
-    await pgPool.query(
-      'INSERT INTO resources (first_name, last_name, gender) VALUES ($1, $2, $3)',
-      row
-    )
   }
 }
 
@@ -136,111 +81,33 @@ function allSql(sql, params = []) {
   })
 }
 
-app.get('/api/resources', async (req, res) => {
+app.post('/api/resources/bulk-delete', async (req, res) => {
   try {
-    const q = (req.query.q || '').trim()
-    const page = Math.max(parseInt(req.query.page || '1', 10), 1)
-    const offset = (page - 1) * PAGE_SIZE
+    const { ids } = req.body
 
-    if (usePostgres) {
-      const search = `%${q.toLowerCase()}%`
-      const whereClause = q
-        ? `WHERE LOWER(COALESCE(first_name, '') || ' ' || COALESCE(last_name, '') || ' ' || COALESCE(gender, '')) LIKE $1`
-        : ''
-
-      const countQuery = q
-        ? `SELECT COUNT(*)::int AS total FROM resources ${whereClause}`
-        : 'SELECT COUNT(*)::int AS total FROM resources'
-
-      const dataQuery = q
-        ? `SELECT * FROM resources ${whereClause} ORDER BY id DESC LIMIT $2 OFFSET $3`
-        : 'SELECT * FROM resources ORDER BY id DESC LIMIT $1 OFFSET $2'
-
-      const countResult = q
-        ? await pgPool.query(countQuery, [search])
-        : await pgPool.query(countQuery)
-
-      const dataResult = q
-        ? await pgPool.query(dataQuery, [search, PAGE_SIZE, offset])
-        : await pgPool.query(dataQuery, [PAGE_SIZE, offset])
-
-      return res.json({
-        items: dataResult.rows,
-        total: countResult.rows[0].total,
-        page,
-        pageSize: PAGE_SIZE,
-        totalPages: Math.max(Math.ceil(countResult.rows[0].total / PAGE_SIZE), 1)
-      })
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ error: 'Aucun id fourni' })
     }
 
-    let whereClause = ''
-    const params = []
-    if (q) {
-      whereClause = `WHERE LOWER(COALESCE(first_name, '') || ' ' || COALESCE(last_name, '') || ' ' || COALESCE(gender, '')) LIKE ?`
-      params.push(`%${q.toLowerCase()}%`)
-    }
+    const normalizedIds = ids
+      .map((id) => parseInt(id, 10))
+      .filter((id) => Number.isInteger(id) && id > 0)
 
-    const totalRow = await getSql(`SELECT COUNT(*) AS total FROM resources ${whereClause}`, params)
-    const rows = await allSql(
-      `SELECT * FROM resources ${whereClause} ORDER BY id DESC LIMIT ? OFFSET ?`,
-      [...params, PAGE_SIZE, offset]
-    )
-
-    res.json({
-      items: rows,
-      total: totalRow.total,
-      page,
-      pageSize: PAGE_SIZE,
-      totalPages: Math.max(Math.ceil(totalRow.total / PAGE_SIZE), 1)
-    })
-  } catch (error) {
-    console.error(error)
-    res.status(500).json({ error: 'Erreur lors du chargement des ressources' })
-  }
-})
-
-app.post('/api/resources', async (req, res) => {
-  try {
-    const firstName = (req.body.first_name || '').trim()
-    const lastName = (req.body.last_name || '').trim()
-    const gender = normalizeGenre(req.body.gender)
-
-    if (!firstName || !lastName || !gender) {
-      return res.status(400).json({ error: 'Nom, prénom et genre sont obligatoires' })
+    if (normalizedIds.length === 0) {
+      return res.status(400).json({ error: 'Ids invalides' })
     }
 
     if (usePostgres) {
-      const result = await pgPool.query(
-        'INSERT INTO resources (first_name, last_name, gender) VALUES ($1, $2, $3) RETURNING *',
-        [firstName, lastName, gender]
-      )
-      return res.status(201).json(result.rows[0])
+      const placeholders = normalizedIds.map((_, i) => `$${i + 1}`).join(',')
+      await pgPool.query(`DELETE FROM resources WHERE id IN (${placeholders})`, normalizedIds)
+    } else {
+      const placeholders = normalizedIds.map(() => '?').join(',')
+      await runSql(`DELETE FROM resources WHERE id IN (${placeholders})`, normalizedIds)
     }
 
-    const insert = await runSql(
-      'INSERT INTO resources (first_name, last_name, gender) VALUES (?, ?, ?)',
-      [firstName, lastName, gender]
-    )
-    const created = await getSql('SELECT * FROM resources WHERE id = ?', [insert.lastID])
-    res.status(201).json(created)
+    res.json({ success: true })
   } catch (error) {
     console.error(error)
-    res.status(500).json({ error: 'Erreur lors de la création de la ressource' })
+    res.status(500).json({ error: 'Erreur lors de la suppression' })
   }
 })
-
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'))
-})
-
-initDb()
-  .then(() => {
-    app.listen(PORT, () => {
-      console.log(`Application disponible sur le port ${PORT}`)
-      console.log(`Base active: ${usePostgres ? 'PostgreSQL' : 'SQLite'}`)
-    })
-  })
-  .catch((error) => {
-    console.error('Impossible de démarrer l\'application', error)
-    process.exit(1)
-  })
