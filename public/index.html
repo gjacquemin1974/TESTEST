@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gestion des ressources</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <main class="container">
+    <header class="hero">
+      <div>
+        <h1>Gestion des ressources</h1>
+        <p>Recherche plein texte sur tous les attributs, pagination par 20 et création rapide</p>
+      </div>
+      <div class="badge">JS + API Express</div>
+    </header>
+
+    <section class="toolbar card">
+      <input id="searchInput" type="search" placeholder="Rechercher sur nom, prénom ou genre" />
+      <button id="searchButton">Rechercher</button>
+      <button id="resetButton" class="secondary">Réinitialiser</button>
+    </section>
+
+    <section class="card">
+      <div class="table-header">
+        <h2>Ressources</h2>
+        <span id="resultInfo"></span>
+      </div>
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Prénom</th>
+              <th>Nom</th>
+              <th>Genre</th>
+              <th>Créé le</th>
+            </tr>
+          </thead>
+          <tbody id="resourceTableBody"></tbody>
+        </table>
+      </div>
+      <div id="emptyState" class="empty hidden">Aucune ressource trouvée</div>
+      <div class="pagination">
+        <button id="prevButton" class="secondary">Précédent</button>
+        <span id="pageInfo"></span>
+        <button id="nextButton" class="secondary">Suivant</button>
+      </div>
+    </section>
+  </main>
+
+  <button id="openFormButton" class="fab" title="Ajouter une ressource">+</button>
+
+  <div id="drawerBackdrop" class="drawer-backdrop hidden"></div>
+  <aside id="drawer" class="drawer hidden">
+    <div class="drawer-header">
+      <h2>Créer une ressource</h2>
+      <button id="closeFormButton" class="icon-button">×</button>
+    </div>
+
+    <form id="resourceForm" class="form">
+      <label>
+        Nom
+        <input type="text" name="last_name" required />
+      </label>
+
+      <label>
+        Prénom
+        <input type="text" name="first_name" required />
+      </label>
+
+      <label>
+        Genre
+        <select name="gender" required>
+          <option value="">Sélectionner</option>
+          <option value="homme">Homme</option>
+          <option value="femme">Femme</option>
+          <option value="autre">Autre</option>
+        </select>
+      </label>
+
+      <button type="submit">Créer</button>
+      <p id="formMessage" class="form-message"></p>
+    </form>
+  </aside>
+
+  <script src="/app.js"></script>
+</body>
+</html>

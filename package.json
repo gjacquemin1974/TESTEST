@@ -1,0 +1,18 @@
+{
+  "name": "resource-manager-app",
+  "version": "1.0.0",
+  "description": "Application web JS pour gerer une liste de ressources avec recherche plein texte, pagination et creation",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "pg": "^8.16.0",
+    "sqlite3": "^5.1.7"
+  }
+}
